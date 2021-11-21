@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Web3 from 'web3';
+import { AppContext } from '../../context/appContext';
 import { useIsMounted } from '../../hooks/useIsMounted';
 import { Match } from '../../types/MarketplaceEntities';
 import ConfirmModal from '../Modals/ConfirmModal';
 import { toastMetamaskError } from '../Toast/Toast';
 
 type Props = {
-    web3: Web3
-    account: string
     match: Match
     updateMatch: () => void
 }
 
-function MarketplaceCancelMatch({ web3, account, match, updateMatch }: Props) {
+function MarketplaceCancelMatch({ match, updateMatch }: Props) {
+    const { signer, address } = useContext(AppContext).state;
     const isMounted = useIsMounted();
     const [loading, setLoading] = useState(false);
     const { t } = useTranslation();
@@ -21,7 +20,7 @@ function MarketplaceCancelMatch({ web3, account, match, updateMatch }: Props) {
     const onSubmit = async () => {
         setLoading(true);
         try {
-            await match.cancelProposedMatch(web3, account);
+            await match.cancelProposedMatch(signer, address);
             updateMatch();
         } catch (e: any) {
             console.error(e);

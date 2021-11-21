@@ -1,53 +1,52 @@
-import detectEthereumProvider from '@metamask/detect-provider';
 import MetaMaskOnboarding from '@metamask/onboarding';
-import React, { useEffect } from 'react';
+import { ethers } from 'ethers';
+import React, { useContext, useEffect } from 'react';
 import { Button, Container } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
-import Web3 from 'web3';
 import metamaskLogo from "../../asset/icon/metamask-logo.svg";
 import ew_logo from '../../asset/img/ew-logo-small.png';
-import { WindowProvider } from '../../types/MetaMask';
+import { AppContext, appContextData } from '../../context/appContext';
+import { allowedChains } from '../../types/constants';
 import toast, { toastMetamaskError } from '../Toast/Toast';
 import './Login.css';
 
-type Props = {
-    setAccount: (account: string) => void;
-    setWeb3: (web3: Web3) => void;
-    setChain: (chain: string) => void;
-    web3?: Web3;
-    chain: string;
+declare var window: {
+    location: { reload: () => any; };
+    ethereum: ethers.providers.ExternalProvider & {
+        request(method: { method: string }): Promise<void>
+        once(event: string, cb: (...args: any[]) => void): void;
+    }
 };
 
-const reloadWindow = (_: any) => window.location.reload();
+type Props = {
+    login: (newContext: appContextData) => void;
+};
 
-function Login({ setAccount, setWeb3, setChain, web3, chain }: Props) {
+function Login({ login }: Props) {
+    const { state, update } = useContext(AppContext);
     const { t } = useTranslation();
-    const allowedChains = ["volta"];
     const onboarding = React.useRef<MetaMaskOnboarding>(new MetaMaskOnboarding());
-
-    const handleAccounts = (accounts: string[]) => {
-        if (accounts && accounts.length > 0) {
-            setAccount(accounts[0]);
-            onboarding.current.stopOnboarding();
-        } else {
-            setAccount('');
-            toast(t("ERROR.NO_ACCOUNT"), 'danger');
-        }
-    }
 
     const onClick = async () => {
         if (MetaMaskOnboarding.isMetaMaskInstalled()) {
             onboarding.current.stopOnboarding();
-            const provider = await detectEthereumProvider() as WindowProvider;
             try {
-                await provider.request({ method: 'eth_requestAccounts' });
-            } catch (e: any) {
-                console.error(e);
-                toastMetamaskError(e, t);
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+            } catch (err: any) {
+                toastMetamaskError(err, t);
+                console.log(err);
+                return;
             }
-            const currentWeb3 = web3 || new Web3(provider);
-            handleAccounts(await currentWeb3.eth.getAccounts());
-            setChain(await currentWeb3.eth.net.getNetworkType());
+            const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            const accounts = await provider.listAccounts();
+            const newContext = {
+                ...state,
+                signer: provider.getSigner(),
+                address: accounts[0],
+                chainName: (await provider.getNetwork()).name,
+            };
+            update(newContext);
+            login(newContext);
         } else {
             toast(t("ERROR.NO_PROVIDER"), 'danger');
             onboarding.current.startOnboarding();
@@ -55,35 +54,31 @@ function Login({ setAccount, setWeb3, setChain, web3, chain }: Props) {
     };
 
     useEffect(() => {
-        const handleAccounts = (accounts: string[]) => {
-            if (accounts && accounts.length > 0) {
-                setAccount(accounts[0]);
-                onboarding.current.stopOnboarding();
-            } else {
-                setAccount('');
-            }
-        }
-        const providerEventSetup = (provider: WindowProvider, newWeb3: Web3) => {
-            provider.removeListener('accountsChanged', reloadWindow);
-            provider.removeListener('chainChanged', reloadWindow);
-            provider.on('accountsChanged', reloadWindow);
-            provider.on('chainChanged', reloadWindow);
-        }
-
         const setup = async () => {
-            const provider = await detectEthereumProvider() as WindowProvider;
-            if (provider !== null) {
-                const newWeb3 = new Web3(provider);
-                const accounts = await newWeb3.eth.getAccounts();
-                const chain = await newWeb3.eth.net.getNetworkType();
-                handleAccounts(accounts);
-                setChain(chain);
-                setWeb3(newWeb3);
-                providerEventSetup(provider, newWeb3);
+            if (window.ethereum === undefined || state.chainName !== "")
+                return;
+            try {
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+            } catch (err: any) {
+                toastMetamaskError(err, t);
+                console.log(err);
+                return;
             }
+            const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            window.ethereum.once('accountsChanged', () => window.location.reload());
+            window.ethereum.once('chainChanged', () => window.location.reload());
+            const accounts = await provider.listAccounts();
+            const newContext = {
+                ...state,
+                signer: provider.getSigner(),
+                address: accounts[0],
+                chainName: (await provider.getNetwork()).name,
+            };
+            update(newContext);
+            login(newContext);
         };
         setup();
-    }, [setWeb3, setChain, setAccount])
+    }, [t, login, state, update]);
 
     return (
         <Container className="h-100">
@@ -102,12 +97,12 @@ function Login({ setAccount, setWeb3, setChain, web3, chain }: Props) {
                             <p>{t('LOGIN.TEXT')}</p>
                             <div className="login-button">
                                 <img alt="metamask logo" src={metamaskLogo} />
-                                <Button onClick={onClick} disabled={!allowedChains.includes(chain) && chain !== ""}>
+                                <Button onClick={onClick} disabled={!allowedChains.includes(state.chainName) && state.chainName !== ""}>
                                     <span>{t('LOGIN.BUTTON_METAMASK')}</span>
                                 </Button>
                             </div>
-                            {(!allowedChains.includes(chain) && chain !== "" &&
-                                <p className="label text-danger">{t('LOGIN.ERROR_UNSUPPORTED_CHAIN', { chain: chain })}</p>
+                            {(!allowedChains.includes(state.chainName) && state.chainName !== "" &&
+                                <p className="label text-danger">{t('LOGIN.ERROR_UNSUPPORTED_CHAIN', { chain: state.chainName })}</p>
                             )}
                         </Container>
                         <div className="mt-4">

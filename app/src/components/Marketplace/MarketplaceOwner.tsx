@@ -1,23 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import { ethers } from 'ethers';
+import React, { useContext, useEffect, useState } from 'react';
 import { Button, Spinner } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
-import Web3 from 'web3';
-import { AbiItem } from 'web3-utils';
 import { abi } from '../../asset/json/IdentityManager.abi.json';
 import { VOLTA_IDENTITY_MANAGER_ADDRESS } from '../../asset/json/voltaContractAddresses.json';
-import IdentityManager from '../../types/IdentityManager';
+import { AppContext } from '../../context/appContext';
+import { IdentityManagerAbi as IdentityManager } from '../../types/IdentityManagerAbi';
 import { Asset } from '../../types/MarketplaceEntities';
 import MarketplaceMatches from '../MarketplaceMatch/MarketplaceMatches';
 import MarketplaceCancelOffer from '../MarketplaceOffer/MarketplaceCancelOffer';
 import MarketplaceCreateOffer from '../MarketplaceOffer/MarketplaceCreateOffer';
 import { toastMetamaskError } from '../Toast/Toast';
 
-type Props = {
-    web3: Web3
-    account: string
-}
-
-function MarketplaceOwner({ web3, account }: Props) {
+function MarketplaceOwner() {
+    const { signer, address } = useContext(AppContext).state;
     const { t } = useTranslation();
     const [assets, setAssets] = useState<Asset[]>([]);
     const [loading, setLoading] = useState(false);
@@ -27,7 +23,7 @@ function MarketplaceOwner({ web3, account }: Props) {
         const fetchAssets = async () => {
             setLoading(true);
             try {
-                setAssets(await Asset.fetchAssets(web3, [account]));
+                setAssets(await Asset.fetchAssets(signer, [address]));
             }
             catch (e: any) {
                 console.error(e);
@@ -37,16 +33,16 @@ function MarketplaceOwner({ web3, account }: Props) {
             setLoading(false);
         }
         fetchAssets();
-    }, [web3, account, t]);
+    }, [signer, address, t]);
 
     const onCreateAsset = async () => {
         setCreatingAsset(true);
-        const identityManagerContract = new web3.eth.Contract(abi as AbiItem[], VOLTA_IDENTITY_MANAGER_ADDRESS) as unknown as IdentityManager;
+        const identityManagerContract = new ethers.Contract(VOLTA_IDENTITY_MANAGER_ADDRESS, abi, signer) as IdentityManager;
         identityManagerContract.once('IdentityCreated', (err, identity) =>
-            err ? console.error(err) : setAssets([...assets, new Asset(identity.returnValues.identity, account)])
+            err ? console.error(err) : setAssets([...assets, new Asset(identity.returnValues.identity, address)])
         );
         try {
-            await identityManagerContract.methods.createIdentity(account).send({ from: account });
+            await identityManagerContract.createIdentity(address);
         } catch (e: any) {
             console.error(e);
             toastMetamaskError(e, t);
@@ -79,11 +75,11 @@ function MarketplaceOwner({ web3, account }: Props) {
                         {
                             asset.doesOfferExists ?
                                 < >
-                                    < MarketplaceCreateOffer web3={web3} account={account} asset={asset} updateAssets={updateAssets} />
-                                    <MarketplaceCancelOffer web3={web3} account={account} asset={asset} updateAssets={updateAssets} />
+                                    < MarketplaceCreateOffer asset={asset} updateAssets={updateAssets} />
+                                    <MarketplaceCancelOffer asset={asset} updateAssets={updateAssets} />
                                 </ >
                                 :
-                                < MarketplaceCreateOffer web3={web3} account={account} asset={asset} updateAssets={updateAssets} />
+                                < MarketplaceCreateOffer asset={asset} updateAssets={updateAssets} />
                         }
                     </div>
                 </div>
@@ -110,7 +106,7 @@ function MarketplaceOwner({ web3, account }: Props) {
                 }
                 {
                     asset.doesOfferExists && asset.isMatched &&
-                    <MarketplaceMatches web3={web3} account={account} asset={asset} />
+                    <MarketplaceMatches asset={asset} />
                 }
             </div>
         ))

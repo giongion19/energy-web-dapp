@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Badge, Spinner } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
-import Web3 from 'web3';
+import { AppContext } from '../../context/appContext';
 import { Asset, Demand, Match } from '../../types/MarketplaceEntities';
 import { toastMetamaskError } from '../Toast/Toast';
 import MarketplaceAcceptMatch from './MarketplaceAcceptMatch';
@@ -9,13 +9,12 @@ import MarketplaceDeleteMatch from './MarketplaceDeleteMatch';
 import MarketplaceRejectMatch from './MarketplaceRejectMatch';
 
 type Props = {
-    web3: Web3
-    account: string
     demand?: Demand
     asset?: Asset
 }
 
-function MarketplaceMatches({ web3, account, asset, demand }: Props) {
+function MarketplaceMatches({ asset, demand }: Props) {
+    const { signer, address } = useContext(AppContext).state;
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [matches, setMatches] = useState<Match[]>([]);
@@ -24,7 +23,7 @@ function MarketplaceMatches({ web3, account, asset, demand }: Props) {
         const fetchDemand = async () => {
             setLoading(true);
             try {
-                const match = demand !== undefined ? Match.fetchMatches(web3, demand) : Match.fetchMatches(web3, asset!);
+                const match = demand !== undefined ? Match.fetchMatches(signer, demand) : Match.fetchMatches(signer, asset!);
                 setMatches(await match);
             } catch (e: any) {
                 toastMetamaskError(e, t);
@@ -32,7 +31,7 @@ function MarketplaceMatches({ web3, account, asset, demand }: Props) {
             setLoading(false);
         }
         fetchDemand();
-    }, [web3, account, asset, demand, t]);
+    }, [signer, address, asset, demand, t]);
 
     const updateMatches = () => setMatches(matches.filter(match => match.doesMatchExists));
 
@@ -43,21 +42,21 @@ function MarketplaceMatches({ web3, account, asset, demand }: Props) {
                     <div className="d-flex justify-content-between">
                         <div className="d-flex align-items-center">
                             <div className="text-muted">{t('GENERAL.ID')}</div>
-                            <Badge variant={match.isAccepted ? "success" : "warning"} className="ml-3">
+                            <Badge bg={match.isAccepted ? "success" : "warning"} className="ml-3">
                                 {match.isAccepted ? t("GENERAL.ACCEPTED") : t("GENERAL.PENDING")}
                             </Badge>
                         </div >
                         <div className="marketplace-button-row">
                             {demand !== undefined && !match.isAccepted &&
-                                <MarketplaceAcceptMatch web3={web3} account={account} match={match} updateMatches={updateMatches} />
+                                <MarketplaceAcceptMatch match={match} updateMatches={updateMatches} />
                             }
                             {
                                 !match.isAccepted &&
-                                <MarketplaceRejectMatch web3={web3} account={account} match={match} updateMatches={updateMatches} />
+                                <MarketplaceRejectMatch match={match} updateMatches={updateMatches} />
 
                             }
                             {match.isAccepted &&
-                                <MarketplaceDeleteMatch web3={web3} account={account} match={match} updateMatches={updateMatches} />
+                                <MarketplaceDeleteMatch match={match} updateMatches={updateMatches} />
                             }
                         </div>
                     </div>
