@@ -18,7 +18,7 @@
 ```
 
 ## Brief description 📝
-Sample DApp meant to showcase the Energy Web's chain capabilities.
+Sample DApp meant to showcase the Energy Web's chain capabilities. It uses web3.js library (see add-ethers branch for ethers.js library)
 
 ## Docs (in italian) 📚
 - [Ew summary](./docs/EW_summary.pdf)
