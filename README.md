@@ -18,7 +18,7 @@
 ```
 
 ## Brief description 📝
-Sample DApp meant to showcase the Energy Web's chain capabilities.
+Sample DApp meant to showcase the Energy Web's chain capabilities. This branch uses ethers.js
 
 ## Docs (in italian) 📚
 - [Ew summary](./docs/EW_summary.pdf)
